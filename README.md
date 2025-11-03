@@ -72,6 +72,7 @@ Currently, the following applications are implemented:
 - `src/object-tracking-feature`: Object detection & tracking based on features using ORB
 - `src/face-detection`: Face detection & tracking
 - `src/object-detection-yolo`: Object detection using YOLO (RPi 3/4/5 only)
+- `src/navigation`: **NEW!** Navigation system for visually impaired users (YOLO + zones + TTS)
 - (*Todo*) Object detection using Neural Network (TensorFlow Lite)
 
 
@@ -110,7 +111,24 @@ Detecting face using Harr Cascade detector.
 Use YOLO (You Only Look Once) for object detection.  
 Note this code is based on Ultralytics YOLO. The instruction can be found at their website: [Quick Start Guide: Raspberry Pi with Ultralytics YOLO11](https://docs.ultralytics.com/guides/raspberry-pi/). Double check if you need to use it in a commercialised project! 
 
-### 3.8. Object Detection using Neural Network (TensorFlow Lite)
+### 3.8. Zone-Based Object Detection with Audio Announcements
+A spatial awareness system that maps detected objects to zones (left/center/right) and provides audio feedback.
+
+Features:
+- Real-time YOLO object detection with spatial zone mapping
+- Offline text-to-speech announcements using espeak
+- Temporal filtering to reduce false positives
+- Configurable priority system for different object classes
+- Extensible design for sensor fusion (ultrasonic, depth cameras, etc.)
+
+Quick start:
+```bash
+./run_navigation.sh
+```
+
+See [`src/navigation/README.md`](src/navigation/README.md) for full documentation.
+
+### 3.9. Object Detection using Neural Network (TensorFlow Lite)
 (ongoing) Use TensorFlow Lite to recognise objects.
 
 
