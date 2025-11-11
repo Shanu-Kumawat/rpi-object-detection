@@ -35,12 +35,18 @@ TTS_ENABLED = True
 TTS_RATE = 175
 MESSAGE_COOLDOWN = 6.0  # Increased to reduce CPU usage on TTS
 GLOBAL_COOLDOWN = 2.0  # Increased from 1.5s
+MAX_ANNOUNCE_OBJECTS = 3  # Maximum objects to announce at once
 
 # Performance settings
 SKIP_FRAMES = 2  # Process every Nth frame (1=all, 2=every other, 3=every third)
 DISPLAY_ENABLED = False  # Disable video window on RPi (saves CPU)
 STATS_ENABLED = False  # Disable FPS stats overlay
 VERBOSE_LOGGING = False  # Reduce console output
+
+# Sensor settings
+ULTRASONIC_ENABLED = False  # Ultrasonic sensor not implemented yet
+ULTRASONIC_CRITICAL_DISTANCE = 1.0  # meters (placeholder)
+ULTRASONIC_WARNING_DISTANCE = 2.0   # meters (placeholder)
 
 # Object priorities (same as config.py)
 CLASS_PRIORITIES = {
