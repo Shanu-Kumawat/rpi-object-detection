@@ -140,6 +140,11 @@ class NavigationSystem:
     
     def run(self):
         """Main processing loop"""
+        frame_counter = 0  # For frame skipping
+        skip_frames = getattr(config, 'SKIP_FRAMES', 1)  # Process every Nth frame
+        display_enabled = getattr(config, 'DISPLAY_ENABLED', True)
+        stats_enabled = getattr(config, 'STATS_ENABLED', True)
+        
         try:
             while True:
                 # Read frame
@@ -147,6 +152,16 @@ class NavigationSystem:
                 if not ret:
                     print("Error: Failed to read frame")
                     break
+                
+                frame_counter += 1
+                
+                # Skip frames if configured (process every Nth frame)
+                if frame_counter % skip_frames != 0:
+                    if display_enabled and self.show_video:
+                        cv2.imshow("Navigation System", frame)
+                    if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
+                        break
+                    continue
                 
                 frame_start = time.time()
                 
@@ -161,25 +176,26 @@ class NavigationSystem:
                     self.fps_history.pop(0)
                 avg_fps = sum(self.fps_history) / len(self.fps_history)
                 
-                # Display video with annotations
-                if self.show_video:
+                # Display video with annotations (only if enabled)
+                if display_enabled and self.show_video:
                     display_frame = frame.copy()
                     self.draw_zones(display_frame)
                     self.draw_detections(display_frame, zone_dict)
                     
-                    # Draw stats
-                    stats_text = [
-                        f"FPS: {avg_fps:.1f}",
-                        f"Inference: {inference_time:.1f}ms",
-                        f"Frame: {frame_time:.1f}ms",
-                        f"Detections: {sum(len(d) for d in zone_dict.values())}",
-                    ]
-                    
-                    y_offset = frame.shape[0] - 20
-                    for text in reversed(stats_text):
-                        cv2.putText(display_frame, text, (10, y_offset), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                        y_offset -= 20
+                    # Draw stats (if enabled)
+                    if stats_enabled:
+                        stats_text = [
+                            f"FPS: {avg_fps:.1f}",
+                            f"Inference: {inference_time:.1f}ms",
+                            f"Frame: {frame_time:.1f}ms",
+                            f"Detections: {sum(len(d) for d in zone_dict.values())}",
+                        ]
+                        
+                        y_offset = frame.shape[0] - 20
+                        for text in reversed(stats_text):
+                            cv2.putText(display_frame, text, (10, y_offset), 
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                            y_offset -= 20
                     
                     cv2.imshow("Navigation System", display_frame)
                 

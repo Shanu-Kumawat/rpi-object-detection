@@ -123,8 +123,18 @@ Features:
 
 Quick start:
 ```bash
+# Desktop/high-performance systems
 ./run_navigation.sh
+
+# Raspberry Pi 3B+ (optimized for low power)
+./run_navigation_rpi.sh
 ```
+
+**Performance:** 
+- Desktop: 20-25 FPS (640x480)
+- RPi 3B+: 3-5 FPS (320x240 optimized)
+
+**⚠️ Raspberry Pi Users:** If getting low FPS (< 1 FPS), see [`RPI_PERFORMANCE_GUIDE.md`](RPI_PERFORMANCE_GUIDE.md) for optimization steps.
 
 See [`src/navigation/README.md`](src/navigation/README.md) for full documentation.
 

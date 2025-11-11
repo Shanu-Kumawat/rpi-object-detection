@@ -46,10 +46,21 @@ class ObjectDetector:
         print(f"Loading YOLO model: {self.model_path}")
         self.model = YOLO(self.model_path)
         
-        # Set model parameters
+        # Set model parameters for optimal performance
         self.model.overrides['conf'] = self.conf_threshold
         self.model.overrides['iou'] = config.IOU_THRESHOLD
         self.model.overrides['verbose'] = False
+        
+        # RPi-specific optimizations (if config has them)
+        if hasattr(config, 'YOLO_INFERENCE_SIZE'):
+            self.model.overrides['imgsz'] = config.YOLO_INFERENCE_SIZE
+            print(f"Using inference size: {config.YOLO_INFERENCE_SIZE}")
+        
+        if hasattr(config, 'YOLO_DEVICE'):
+            self.model.overrides['device'] = config.YOLO_DEVICE
+            
+        if hasattr(config, 'YOLO_MAX_DETECTIONS'):
+            self.model.overrides['max_det'] = config.YOLO_MAX_DETECTIONS
         
         print(f"Detector ready (conf={self.conf_threshold}, iou={config.IOU_THRESHOLD})")
         
