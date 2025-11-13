@@ -52,10 +52,15 @@ CLASS_PRIORITIES = {
 # Maximum objects to announce at once
 MAX_ANNOUNCE_OBJECTS = 3
 
-# Ultrasonic sensor settings (placeholder for future)
-ULTRASONIC_ENABLED = False
-ULTRASONIC_CRITICAL_DISTANCE = 1.0  # meters
-ULTRASONIC_WARNING_DISTANCE = 2.0   # meters
+# Ultrasonic sensor settings
+ULTRASONIC_ENABLED = True  # Enable ultrasonic sensor
+ULTRASONIC_CRITICAL_DISTANCE = 2.0  # meters - trigger critical alert
+ULTRASONIC_WARNING_DISTANCE = 3.0   # meters - trigger warning
+
+# WebSocket settings for mobile app
+WEBSOCKET_ENABLED = True
+WEBSOCKET_HOST = "0.0.0.0"  # Listen on all network interfaces
+WEBSOCKET_PORT = 8765
 
 # Performance settings
 INFERENCE_THREADS = 2  # CPU threads for YOLO

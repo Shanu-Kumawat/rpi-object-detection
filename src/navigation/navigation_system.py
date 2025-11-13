@@ -11,11 +11,18 @@ import time
 import argparse
 from typing import Optional
 
+try:
+    from picamera2 import Picamera2
+    PICAMERA2_AVAILABLE = True
+except ImportError:
+    PICAMERA2_AVAILABLE = False
+
 from . import config
 from .detector import ObjectDetector
 from .zone_mapper import ZoneMapper
 from .announcer import AudioAnnouncer
 from .sensor import UltrasonicSensor
+from .websocket_server import NavigationWebSocketServer
 
 
 class NavigationSystem:
@@ -44,18 +51,33 @@ class NavigationSystem:
         
         # Initialize camera
         print(f"\nInitializing camera {camera_id}...")
-        self.cap = cv2.VideoCapture(camera_id)
-        if not self.cap.isOpened():
-            raise RuntimeError(f"Failed to open camera {camera_id}")
+        self.use_picamera2 = PICAMERA2_AVAILABLE
         
-        # Set camera properties
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
-        self.cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
-        
-        actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"Camera opened: {actual_width}x{actual_height}")
+        if self.use_picamera2:
+            # Use Picamera2 for Raspberry Pi
+            self.cap = Picamera2()
+            camera_config = self.cap.create_preview_configuration(
+                main={"size": (config.CAMERA_WIDTH, config.CAMERA_HEIGHT), "format": "RGB888"}
+            )
+            self.cap.configure(camera_config)
+            self.cap.start()
+            actual_width = config.CAMERA_WIDTH
+            actual_height = config.CAMERA_HEIGHT
+            print(f"Camera opened: {actual_width}x{actual_height}")
+        else:
+            # Fallback to OpenCV VideoCapture
+            self.cap = cv2.VideoCapture(camera_id)
+            if not self.cap.isOpened():
+                raise RuntimeError(f"Failed to open camera {camera_id}")
+            
+            # Set camera properties
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+            self.cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
+            
+            actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            print(f"Camera opened: {actual_width}x{actual_height}")
         
         # Initialize components
         print("\nInitializing detection system...")
@@ -63,6 +85,16 @@ class NavigationSystem:
         self.zone_mapper = ZoneMapper(frame_width=actual_width)
         self.announcer = AudioAnnouncer(enabled=enable_tts)
         self.sensor = UltrasonicSensor(enabled=config.ULTRASONIC_ENABLED)
+        
+        # Initialize WebSocket server for mobile app
+        self.ws_server = None
+        if config.WEBSOCKET_ENABLED:
+            self.ws_server = NavigationWebSocketServer(
+                host=config.WEBSOCKET_HOST,
+                port=config.WEBSOCKET_PORT
+            )
+            self.ws_server.start()
+            time.sleep(0.5)  # Give server time to start
         
         # Stats
         self.frame_count = 0
@@ -123,15 +155,66 @@ class NavigationSystem:
         # Map to zones and filter
         zone_dict = self.zone_mapper.process(detections)
         
-        # Check ultrasonic sensor (if enabled)
+        # Read ultrasonic distance
+        ultrasonic_distance = None
         if self.sensor.enabled:
-            distance = self.sensor.read_distance()
-            if distance and distance < config.ULTRASONIC_CRITICAL_DISTANCE:
-                # Priority announcement for obstacle
-                self.announcer.announce("Stop! Obstacle ahead!", priority=True)
+            ultrasonic_distance = self.sensor.get_average_distance(samples=3)
         
-        # Announce detections
-        self.announcer.announce_detections(zone_dict)
+        # Extract front objects for better ultrasonic messages
+        front_objects = []
+        if 'center' in zone_dict and zone_dict['center']:
+            # Sort by priority (already done by zone_mapper)
+            front_objects = [zd.detection.class_name for zd in zone_dict['center'][:2]]
+        
+        # Generate message with ultrasonic integration
+        message = None
+        is_priority = False
+        
+        # Priority 1: Ultrasonic critical alert with object name
+        if ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_CRITICAL_DISTANCE:
+            if front_objects:
+                obj_name = front_objects[0]
+                message = f"Stop! {obj_name} ahead at {ultrasonic_distance:.1f} meters"
+            else:
+                message = f"Stop! Obstacle ahead at {ultrasonic_distance:.1f} meters"
+            is_priority = True
+        
+        # Priority 2: Ultrasonic warning with object name
+        elif ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_WARNING_DISTANCE:
+            if front_objects:
+                obj_name = front_objects[0]
+                message = f"Warning: {obj_name} in front at {ultrasonic_distance:.1f} meters"
+            else:
+                message = f"Warning: Obstacle in front at {ultrasonic_distance:.1f} meters"
+            is_priority = True
+        
+        # Priority 3: Regular zone-based announcements
+        else:
+            message = self.announcer.generate_message(zone_dict)
+            is_priority = False
+        
+        # Announce message
+        if message:
+            self.announcer.announce(message, priority=is_priority)
+        
+        # Send WebSocket alerts to mobile app
+        if self.ws_server and self.ws_server.running:
+            if ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_CRITICAL_DISTANCE:
+                obj_name = front_objects[0] if front_objects else "obstacle"
+                self.ws_server.broadcast_alert_sync(
+                    "critical",
+                    message,
+                    distance=ultrasonic_distance,
+                    object_name=obj_name
+                )
+            elif ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_WARNING_DISTANCE:
+                obj_name = front_objects[0] if front_objects else "obstacle"
+                self.ws_server.broadcast_alert_sync(
+                    "warning",
+                    message,
+                    distance=ultrasonic_distance,
+                    object_name=obj_name
+                )
         
         # Update stats
         self.frame_count += 1
@@ -148,7 +231,12 @@ class NavigationSystem:
         try:
             while True:
                 # Read frame
-                ret, frame = self.cap.read()
+                if self.use_picamera2:
+                    frame = self.cap.capture_array()
+                    ret = frame is not None
+                else:
+                    ret, frame = self.cap.read()
+                
                 if not ret:
                     print("Error: Failed to read frame")
                     break
@@ -227,10 +315,15 @@ class NavigationSystem:
         print(f"  Average FPS: {avg_fps:.1f}")
         
         # Release resources
-        self.cap.release()
+        if self.use_picamera2:
+            self.cap.stop()
+        else:
+            self.cap.release()
         cv2.destroyAllWindows()
         self.announcer.stop()
         self.sensor.cleanup()
+        if self.ws_server:
+            self.ws_server.stop()
         
         print("Cleanup complete")
 

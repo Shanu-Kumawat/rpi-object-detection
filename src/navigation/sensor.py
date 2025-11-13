@@ -1,59 +1,153 @@
 # ------------------------------------------------------------------------------
-# Ultrasonic Sensor Module (Stub for Future Integration)
+# Ultrasonic Sensor Module (HC-SR04)
 # ------------------------------------------------------------------------------
-# Placeholder for ultrasonic distance sensor integration
+# Measures distance using GPIO pins on Raspberry Pi
 # ------------------------------------------------------------------------------
 
 import time
 from typing import Optional
 
+# Try to import RPi.GPIO
+try:
+    import RPi.GPIO as GPIO
+    GPIO_AVAILABLE = True
+except (ImportError, RuntimeError):
+    GPIO_AVAILABLE = False
+
 
 class UltrasonicSensor:
-    """
-    Stub for ultrasonic distance sensor
+    """HC-SR04 Ultrasonic distance sensor"""
     
-    This is a placeholder for future integration with HC-SR04 or similar sensors.
-    On Raspberry Pi, you would use GPIO pins to trigger and read echo signals.
-    """
+    # GPIO pins (BCM numbering)
+    TRIG_PIN = 17  # Physical pin 11
+    ECHO_PIN = 27  # Physical pin 13
     
-    def __init__(self, enabled: bool = False):
+    # Timing constants
+    TRIG_PULSE_DURATION = 0.00001  # 10 microseconds
+    MAX_DISTANCE = 4.0  # Maximum reliable distance in meters
+    TIMEOUT = 0.04  # 40ms timeout (corresponds to ~6.8m)
+    
+    def __init__(self, enabled: bool = True, trig_pin: int = None, echo_pin: int = None):
         """
         Initialize ultrasonic sensor
         
         Args:
-            enabled: Enable sensor (False for now as it's a stub)
+            enabled: Enable sensor (False for testing without hardware)
+            trig_pin: GPIO pin for trigger (BCM numbering)
+            echo_pin: GPIO pin for echo (BCM numbering)
         """
-        self.enabled = enabled
+        self.enabled = enabled and GPIO_AVAILABLE
+        self.trig_pin = trig_pin or self.TRIG_PIN
+        self.echo_pin = echo_pin or self.ECHO_PIN
         self.last_distance = None
         self.last_read_time = 0
         
         if self.enabled:
-            print("UltrasonicSensor: Stub mode (not implemented yet)")
-            # TODO: Initialize GPIO pins for trigger and echo
-            # import RPi.GPIO as GPIO
-            # GPIO.setmode(GPIO.BCM)
-            # GPIO.setup(TRIGGER_PIN, GPIO.OUT)
-            # GPIO.setup(ECHO_PIN, GPIO.IN)
+            self._setup_gpio()
+            print(f"UltrasonicSensor initialized (TRIG: GPIO{self.trig_pin}, ECHO: GPIO{self.echo_pin})")
+        else:
+            if not GPIO_AVAILABLE:
+                print("UltrasonicSensor disabled (RPi.GPIO not available)")
+            else:
+                print("UltrasonicSensor disabled (manual)")
+    
+    def _setup_gpio(self):
+        """Setup GPIO pins"""
+        try:
+            # Set GPIO mode to BCM
+            GPIO.setmode(GPIO.BCM)
+            
+            # Disable warnings
+            GPIO.setwarnings(False)
+            
+            # Setup pins
+            GPIO.setup(self.trig_pin, GPIO.OUT)
+            GPIO.setup(self.echo_pin, GPIO.IN)
+            
+            # Ensure trigger is low
+            GPIO.output(self.trig_pin, False)
+            time.sleep(0.1)  # Let sensor settle
+            
+        except Exception as e:
+            print(f"Error setting up GPIO: {e}")
+            self.enabled = False
     
     def read_distance(self) -> Optional[float]:
         """
-        Read distance from sensor
+        Read distance from ultrasonic sensor
         
         Returns:
-            Distance in meters, or None if sensor disabled or read failed
+            Distance in meters, or None if reading failed
         """
         if not self.enabled:
             return None
         
-        # TODO: Implement actual sensor reading
-        # This would involve:
-        # 1. Send trigger pulse (10us HIGH)
-        # 2. Wait for echo pin to go HIGH
-        # 3. Measure time until echo pin goes LOW
-        # 4. Calculate distance: distance = (time * speed_of_sound) / 2
+        try:
+            # Send trigger pulse
+            GPIO.output(self.trig_pin, True)
+            time.sleep(self.TRIG_PULSE_DURATION)
+            GPIO.output(self.trig_pin, False)
+            
+            # Wait for echo start
+            timeout_start = time.time()
+            pulse_start = timeout_start
+            while GPIO.input(self.echo_pin) == 0:
+                pulse_start = time.time()
+                if pulse_start - timeout_start > self.TIMEOUT:
+                    return None  # Timeout
+            
+            # Wait for echo end
+            timeout_start = time.time()
+            pulse_end = pulse_start
+            while GPIO.input(self.echo_pin) == 1:
+                pulse_end = time.time()
+                if pulse_end - timeout_start > self.TIMEOUT:
+                    return None  # Timeout
+            
+            # Calculate distance
+            pulse_duration = pulse_end - pulse_start
+            
+            # Speed of sound: 343 m/s at 20°C
+            # Distance = (Time × Speed) / 2
+            distance = (pulse_duration * 343) / 2
+            
+            # Validate reading
+            if distance > self.MAX_DISTANCE or distance < 0.02:  # Min 2cm
+                return None  # Out of range
+            
+            self.last_distance = distance
+            self.last_read_time = time.time()
+            
+            return distance
+            
+        except Exception as e:
+            print(f"Error reading ultrasonic sensor: {e}")
+            return None
+    
+    def get_average_distance(self, samples: int = 3) -> Optional[float]:
+        """
+        Get average distance from multiple samples
         
-        # For now, return None (stub)
-        return None
+        Args:
+            samples: Number of samples to average
+            
+        Returns:
+            Average distance in meters, or None if failed
+        """
+        if not self.enabled:
+            return None
+        
+        readings = []
+        for _ in range(samples):
+            distance = self.read_distance()
+            if distance is not None:
+                readings.append(distance)
+            time.sleep(0.01)  # Small delay between readings (10ms)
+        
+        if not readings:
+            return None
+        
+        return sum(readings) / len(readings)
     
     def get_status(self) -> str:
         """
@@ -91,44 +185,50 @@ class UltrasonicSensor:
     
     def cleanup(self):
         """Cleanup GPIO resources"""
-        if self.enabled:
-            # TODO: Cleanup GPIO
-            # GPIO.cleanup()
-            pass
+        if self.enabled and GPIO_AVAILABLE:
+            try:
+                GPIO.cleanup([self.trig_pin, self.echo_pin])
+            except:
+                pass
 
 
-# Example integration code for future reference:
-"""
-# On Raspberry Pi with HC-SR04 sensor:
-
-import RPi.GPIO as GPIO
-import time
-
-TRIGGER_PIN = 23  # GPIO pin for trigger
-ECHO_PIN = 24     # GPIO pin for echo
-
-def read_distance():
-    # Send trigger pulse
-    GPIO.output(TRIGGER_PIN, True)
-    time.sleep(0.00001)  # 10 microseconds
-    GPIO.output(TRIGGER_PIN, False)
+# Test function
+def test_sensor():
+    """Test ultrasonic sensor"""
+    print("Testing Ultrasonic Sensor (HC-SR04)")
+    print("Press Ctrl+C to stop\n")
     
-    # Wait for echo
-    start_time = time.time()
-    while GPIO.input(ECHO_PIN) == 0:
-        start_time = time.time()
-        if time.time() - start_time > 0.1:  # Timeout
-            return None
+    sensor = UltrasonicSensor(enabled=True)
     
-    stop_time = time.time()
-    while GPIO.input(ECHO_PIN) == 1:
-        stop_time = time.time()
-        if time.time() - start_time > 0.1:  # Timeout
-            return None
+    if not sensor.enabled:
+        print("Sensor not available!")
+        return
     
-    # Calculate distance
-    elapsed = stop_time - start_time
-    distance = (elapsed * 34300) / 2  # Speed of sound = 343 m/s
+    try:
+        while True:
+            distance = sensor.get_average_distance(samples=5)
+            
+            if distance is not None:
+                print(f"Distance: {distance:.2f} m ({distance * 100:.1f} cm)")
+                
+                # Alert if too close
+                if distance < 2.0:
+                    print("  ⚠️  ALERT: Object within 2 meters!")
+                elif distance < 3.0:
+                    print("  ⚡ WARNING: Object within 3 meters")
+            else:
+                print("No object detected (out of range)")
+            
+            time.sleep(0.5)
     
-    return distance / 100  # Convert cm to meters
-"""
+    except KeyboardInterrupt:
+        print("\nTest stopped")
+    
+    finally:
+        sensor.cleanup()
+        print("Cleanup complete")
+
+
+if __name__ == '__main__':
+    test_sensor()
+
