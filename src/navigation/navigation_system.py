@@ -155,12 +155,19 @@ class NavigationSystem:
         # Map to zones and filter
         zone_dict = self.zone_mapper.process(detections)
         
+        # Print all detected objects (any zone)
+        all_detections = []
+        for zone, dets in zone_dict.items():
+            for zd in dets:
+                all_detections.append(f"{zd.detection.class_name}({zd.detection.confidence:.2f})")
+        
+        if all_detections:
+            print(f"🎯 Detected: {', '.join(all_detections)}")
+        
         # Read ultrasonic distance
         ultrasonic_distance = None
         if self.sensor.enabled:
             ultrasonic_distance = self.sensor.get_average_distance(samples=3)
-            if ultrasonic_distance is not None:
-                print(f"📏 Ultrasonic: {ultrasonic_distance:.2f}m")  # Debug output
         
         # Extract front objects for better ultrasonic messages
         front_objects = []
@@ -203,7 +210,7 @@ class NavigationSystem:
         if self.ws_server and self.ws_server.running:
             if ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_CRITICAL_DISTANCE:
                 obj_name = front_objects[0] if front_objects else "obstacle"
-                print(f"📱 Sending CRITICAL alert to app: {obj_name} at {ultrasonic_distance:.2f}m")
+                print(f"⚠️  CRITICAL ALERT: {obj_name} at {ultrasonic_distance:.2f}m - Sent to mobile app")
                 self.ws_server.broadcast_alert_sync(
                     "critical",
                     message if message else f"Critical: {obj_name}",
@@ -212,7 +219,6 @@ class NavigationSystem:
                 )
             elif ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_WARNING_DISTANCE:
                 obj_name = front_objects[0] if front_objects else "obstacle"
-                print(f"📱 Sending WARNING alert to app: {obj_name} at {ultrasonic_distance:.2f}m")
                 self.ws_server.broadcast_alert_sync(
                     "warning",
                     message if message else f"Warning: {obj_name}",

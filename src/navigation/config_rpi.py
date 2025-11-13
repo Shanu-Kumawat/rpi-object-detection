@@ -6,39 +6,39 @@
 # ------------------------------------------------------------------------------
 
 # Camera settings - REDUCED for RPi performance
-CAMERA_WIDTH = 320  # Reduced from 640 (4x fewer pixels to process)
-CAMERA_HEIGHT = 240  # Reduced from 480
-CAMERA_FPS = 15  # Reduced from 30 (RPi camera can't sustain high FPS with processing)
+CAMERA_WIDTH = 160  # Reduced from 640 (4x fewer pixels to process)
+CAMERA_HEIGHT = 120  # Reduced from 480
+CAMERA_FPS = 10  # Reduced from 15 for better processing time
 
 # YOLO model settings
 YOLO_MODEL = "yolo11n.pt"  # Keep nano model
-CONFIDENCE_THRESHOLD = 0.5  # Increased to reduce false positives
+CONFIDENCE_THRESHOLD = 0.6  # Increased to reduce false positives and processing
 IOU_THRESHOLD = 0.5
 
 # CRITICAL: Model inference settings for RPi
 # These override YOLO's default settings for speed
-YOLO_INFERENCE_SIZE = 320  # Use smaller input size (default is 640)
+YOLO_INFERENCE_SIZE = 192  # Reduced from 256 (smaller = faster)
 YOLO_DEVICE = "cpu"  # RPi doesn't have GPU
 YOLO_HALF_PRECISION = False  # RPi ARM doesn't support FP16
-YOLO_MAX_DETECTIONS = 10  # Limit number of detections processed
+YOLO_MAX_DETECTIONS = 5  # Reduced from 10 (fewer objects to process)
 
 # Zone boundaries (as fraction of frame width)
 ZONE_LEFT_END = 0.33
 ZONE_RIGHT_START = 0.67
 
 # Persistence settings - RELAXED for lower FPS
-PERSISTENCE_FRAMES = 2  # Reduced from 3 (since we have fewer frames/sec)
-MAX_TRACKING_DISTANCE = 80  # Reduced for smaller resolution
+PERSISTENCE_FRAMES = 1  # Reduced from 2 for faster response (no filtering)
+MAX_TRACKING_DISTANCE = 50  # Reduced for smaller resolution
 
 # Audio settings
 TTS_ENABLED = True
 TTS_RATE = 175
-MESSAGE_COOLDOWN = 6.0  # Increased to reduce CPU usage on TTS
-GLOBAL_COOLDOWN = 2.0  # Increased from 1.5s
-MAX_ANNOUNCE_OBJECTS = 3  # Maximum objects to announce at once
+MESSAGE_COOLDOWN = 8.0  # Increased to reduce CPU usage on TTS
+GLOBAL_COOLDOWN = 3.0  # Increased from 2s
+MAX_ANNOUNCE_OBJECTS = 2  # Reduced from 3
 
 # Performance settings
-SKIP_FRAMES = 2  # Process every Nth frame (1=all, 2=every other, 3=every third)
+SKIP_FRAMES = 3  # Process every 3rd frame (increased from 2)
 DISPLAY_ENABLED = False  # Disable video window on RPi (saves CPU)
 STATS_ENABLED = False  # Disable FPS stats overlay
 VERBOSE_LOGGING = False  # Reduce console output
