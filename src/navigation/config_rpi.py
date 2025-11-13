@@ -43,11 +43,6 @@ DISPLAY_ENABLED = False  # Disable video window on RPi (saves CPU)
 STATS_ENABLED = False  # Disable FPS stats overlay
 VERBOSE_LOGGING = False  # Reduce console output
 
-# Sensor settings
-ULTRASONIC_ENABLED = False  # Ultrasonic sensor not implemented yet
-ULTRASONIC_CRITICAL_DISTANCE = 1.0  # meters (placeholder)
-ULTRASONIC_WARNING_DISTANCE = 2.0   # meters (placeholder)
-
 # Object priorities (same as config.py)
 CLASS_PRIORITIES = {
     "person": 10,
@@ -80,3 +75,12 @@ CLASS_PRIORITIES = {
     "teddy bear": 2,
     "sports ball": 3,
 }
+# Ultrasonic sensor settings
+ULTRASONIC_ENABLED = True  # Enable ultrasonic sensor
+ULTRASONIC_CRITICAL_DISTANCE = 2.0  # meters - trigger critical alert
+ULTRASONIC_WARNING_DISTANCE = 3.0   # meters - trigger warning
+
+# WebSocket settings for mobile app
+WEBSOCKET_ENABLED = True
+WEBSOCKET_HOST = "0.0.0.0"  # Listen on all network interfaces
+WEBSOCKET_PORT = 8765
