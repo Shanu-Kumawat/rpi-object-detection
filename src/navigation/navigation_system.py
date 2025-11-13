@@ -159,6 +159,8 @@ class NavigationSystem:
         ultrasonic_distance = None
         if self.sensor.enabled:
             ultrasonic_distance = self.sensor.get_average_distance(samples=3)
+            if ultrasonic_distance is not None:
+                print(f"📏 Ultrasonic: {ultrasonic_distance:.2f}m")  # Debug output
         
         # Extract front objects for better ultrasonic messages
         front_objects = []
@@ -201,17 +203,19 @@ class NavigationSystem:
         if self.ws_server and self.ws_server.running:
             if ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_CRITICAL_DISTANCE:
                 obj_name = front_objects[0] if front_objects else "obstacle"
+                print(f"📱 Sending CRITICAL alert to app: {obj_name} at {ultrasonic_distance:.2f}m")
                 self.ws_server.broadcast_alert_sync(
                     "critical",
-                    message,
+                    message if message else f"Critical: {obj_name}",
                     distance=ultrasonic_distance,
                     object_name=obj_name
                 )
             elif ultrasonic_distance is not None and ultrasonic_distance < config.ULTRASONIC_WARNING_DISTANCE:
                 obj_name = front_objects[0] if front_objects else "obstacle"
+                print(f"📱 Sending WARNING alert to app: {obj_name} at {ultrasonic_distance:.2f}m")
                 self.ws_server.broadcast_alert_sync(
                     "warning",
-                    message,
+                    message if message else f"Warning: {obj_name}",
                     distance=ultrasonic_distance,
                     object_name=obj_name
                 )
